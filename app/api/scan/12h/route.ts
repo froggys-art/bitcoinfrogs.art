@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { alreadyAwardedInWindowDB, awardPointsDB, ensureLeaderboardRowDB, getVerifiedUsersForScanDB, updateLeaderboardScanMarksDB } from '../../../db/client'
-import { findRibbitTaggedTweetApp, findRibbitTweetApp } from '../../../lib/x'
+import { findRibbitTaggedTweetApp, findRibbitTweetApp } from '../../../lib/twitter'
 
 export const runtime = 'nodejs'
 
