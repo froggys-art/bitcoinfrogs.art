@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getTwitterConfig, refreshAccessToken, getCurrentUser, getUserByUsername, appIsFollowing, appFindRecentTweetContaining } from '../../../lib/twitter'
+import { getTwitterConfig, refreshAccessToken, getCurrentUser, getUserByUsername, isFollowing, findRecentTweetContaining } from '../../../lib/twitter'
 import { getLatestTwitterVerificationDB, addTwitterVerificationDB, getTwitterTokensDB, saveTwitterTokensDB } from '../../../db/client'
 import { getLatestTwitterVerificationMem, getTwitterTokens, saveTwitterTokens, upsertTwitterVerificationMem } from '../../../lib/memdb'
 import { cookies } from 'next/headers'
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     const { clientId, appHandle, requiredPhrase } = getTwitterConfig()
     console.log('[RECHECK] Config:', { appHandle, requiredPhrase })
 
-    // Get user's OAuth tokens
+    // Retrieve user's OAuth tokens (memory -> DB -> cookie)
     let tokens = getTwitterTokens(address)
     if (!tokens) {
       const row = await getTwitterTokensDB(address)
@@ -31,13 +31,9 @@ export async function POST(req: Request) {
       try {
         const xtok = cookies().get('xtok')?.value
         if (xtok) {
-          const parsed = JSON.parse(decodeURIComponent(xtok)) as any
+          const parsed = JSON.parse(decodeURIComponent(xtok)) as { walletId: string; accessToken: string; refreshToken?: string; expiresAt?: number }
           if (parsed?.walletId === address && parsed.accessToken) {
-            tokens = {
-              accessToken: parsed.accessToken,
-              refreshToken: parsed.refreshToken,
-              expiresAt: parsed.expiresAt,
-            }
+            tokens = { accessToken: parsed.accessToken, refreshToken: parsed.refreshToken, expiresAt: parsed.expiresAt }
             saveTwitterTokens(address, tokens)
             await saveTwitterTokensDB({
               walletId: address,
@@ -49,23 +45,17 @@ export async function POST(req: Request) {
         }
       } catch {}
     }
+    if (!tokens) return NextResponse.json({ error: 'not_connected' }, { status: 400 })
 
-    if (!tokens) {
-      return NextResponse.json({ error: 'not_connected', message: 'Please connect your Twitter account first' }, { status: 400 })
-    }
-
-    console.log('[RECHECK] Has tokens, checking expiry...')
-
-    // Refresh if expired
+    // Refresh if expired/near-expiry and we have a refresh token
     const now = Date.now()
     if (tokens.expiresAt && tokens.expiresAt - now < 60_000 && tokens.refreshToken) {
       try {
-        console.log('[RECHECK] Refreshing token...')
         const refreshed = await refreshAccessToken({ clientId, refreshToken: tokens.refreshToken })
         tokens = {
           accessToken: refreshed.access_token,
           refreshToken: refreshed.refresh_token || tokens.refreshToken,
-          expiresAt: Date.now() + (Number(refreshed.expires_in || 0) * 1000),
+          expiresAt: Date.now() + Number(refreshed.expires_in || 0) * 1000,
         }
         saveTwitterTokens(address, tokens)
         await saveTwitterTokensDB({
@@ -75,57 +65,52 @@ export async function POST(req: Request) {
           expiresAt: tokens.expiresAt ? new Date(tokens.expiresAt) : undefined,
         })
       } catch (e: any) {
-        console.error('[RECHECK] Token refresh failed:', e?.message)
+        console.error('[RECHECK] token_refresh_failed:', e?.message)
       }
     }
 
-    // Get current user
-    console.log('[RECHECK] Getting current user...')
-    const me = await getCurrentUser(tokens.accessToken)
-    const userId = me.data.id
-    const handle = me.data.username
-    console.log('[RECHECK] User:', { handle, userId })
+    // Re-check follow and tweet using USER token (PKCE scopes)
+    let handle = 'unknown'
+    let userId = 'unknown'
+    try {
+      const me = await getCurrentUser(tokens.accessToken)
+      userId = me.data.id
+      handle = me.data.username
+    } catch (e: any) {
+      console.error('[RECHECK] get_current_user_failed:', e?.message)
+      return NextResponse.json({ error: 'get_current_user_failed', detail: e?.message }, { status: 400 })
+    }
 
-    // Check follow and tweet using Bearer token (App-Only)
     let followed = false
     let tweetId: string | null = null
     let followErr: string | null = null
     let tweetErr: string | null = null
 
-    console.log('[RECHECK] Checking follow status with Bearer token...')
     try {
       const target = await getUserByUsername(tokens.accessToken, appHandle)
-      console.log('[RECHECK] Target user:', target.data)
-      followed = await appIsFollowing(userId, target.data.id)
-      console.log('[RECHECK] Follow result:', followed)
+      followed = await isFollowing(tokens.accessToken, userId, target.data.id)
     } catch (e: any) {
-      followErr = e?.message || 'follow_check_failed'
-      console.error('[RECHECK] Follow check error:', followErr)
+      followErr = e?.message || 'get_following_failed'
     }
-
-    console.log('[RECHECK] Checking tweet with Bearer token...')
     try {
-      tweetId = await appFindRecentTweetContaining(handle, requiredPhrase)
-      console.log('[RECHECK] Tweet result:', tweetId)
+      tweetId = await findRecentTweetContaining(tokens.accessToken, userId, requiredPhrase)
     } catch (e: any) {
-      tweetErr = e?.message || 'tweet_check_failed'
-      console.error('[RECHECK] Tweet check error:', tweetErr)
+      tweetErr = e?.message || 'get_user_tweets_failed'
     }
 
     const points = (followed ? 10 : 0) + (tweetId ? 10 : 0)
-    console.log('[RECHECK] Final points:', points)
 
-    // Persist
+    // Persist a new record (non-fatal if DB fails)
     upsertTwitterVerificationMem({ walletId: address, twitterUserId: userId, handle, followedJoinFroggys: followed, ribbitTweeted: !!tweetId, ribbitTweetId: tweetId || undefined, points, verifiedAt: Date.now() })
     try {
       await addTwitterVerificationDB({ walletId: address, twitterUserId: userId, handle, followedJoinFroggys: followed, ribbitTweeted: !!tweetId, ribbitTweetId: tweetId || undefined, points, verifiedAt: new Date() })
     } catch (e: any) {
-      console.error('[RECHECK] DB save error:', e?.message)
+      // swallow; client will still get immediate status from response body
+      console.error('[RECHECK] db_persist_failed:', e?.message)
     }
 
     return NextResponse.json({ ok: true, handle, followedJoinFroggys: followed, ribbitTweeted: !!tweetId, ribbitTweetId: tweetId, points, debug: { followErr, tweetErr } })
   } catch (e: any) {
-    console.error('[RECHECK] Fatal error:', e?.message, e?.stack)
-    return NextResponse.json({ error: e?.message || 'failed', stack: e?.stack }, { status: 500 })
+    return NextResponse.json({ error: e?.message || 'failed' }, { status: 500 })
   }
 }
