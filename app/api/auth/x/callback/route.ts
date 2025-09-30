@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { exchangeCodeForTokens, getCurrentUser } from '../../../../lib/x'
 import { saveTwitterTokensDB, upsertWalletDB } from '../../../../db/client'
-import { oauthStates } from '../start/route'
+import { oauthStates } from '../../../../lib/oauth-state'
 
 export async function GET(request: Request) {
   try {

@@ -1,12 +1,6 @@
 import { NextResponse } from 'next/server'
 import { buildAuthUrl, generateCodeVerifier, generateCodeChallenge, generateState } from '../../../../lib/x'
-
-// In-memory store for OAuth state (use Redis in production)
-const oauthStates = new Map<string, {
-  codeVerifier: string
-  walletAddress: string
-  createdAt: number
-}>()
+import { oauthStates, cleanupOldStates } from '../../../../lib/oauth-state'
 
 export async function POST(request: Request) {
   try {
@@ -29,11 +23,7 @@ export async function POST(request: Request) {
     })
     
     // Clean up old states
-    for (const [key, value] of oauthStates.entries()) {
-      if (Date.now() - value.createdAt > 5 * 60 * 1000) {
-        oauthStates.delete(key)
-      }
-    }
+    cleanupOldStates()
     
     const authUrl = buildAuthUrl(state, codeChallenge)
     
@@ -44,6 +34,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
-
-// Export the state store for callback to access
-export { oauthStates }
