@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getXConfig, exchangeCodeForToken, getCurrentUser, getUserByUsername, isFollowing, findRecentTweetContaining } from '../../../lib/twitter'
-import { addTwitterVerificationDB, saveTwitterTokensDB } from '../../../db/client'
+import { addTwitterVerificationDB, saveTwitterTokensDB, syncTwitterVerificationsToSocialFi } from '../../../db/client'
 import { saveTwitterTokens, upsertTwitterVerificationMem } from '../../../lib/memdb'
 import { cookies } from 'next/headers'
 
@@ -109,6 +109,14 @@ export async function GET(req: Request) {
         points,
         verifiedAt: new Date()
       })
+      
+      // Automatically sync to leaderboard tables
+      try {
+        await syncTwitterVerificationsToSocialFi()
+        console.log('Successfully synced Twitter verification to leaderboard')
+      } catch (syncError: any) {
+        console.error('Sync to leaderboard failed (non-fatal):', syncError)
+      }
     } catch (e: any) {
       console.error('Database save error (non-fatal):', e)
     }

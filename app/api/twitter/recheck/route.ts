@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getTwitterConfig, refreshAccessToken, getCurrentUser, getUserByUsername, isFollowing, findRecentTweetContaining } from '../../../lib/twitter'
-import { getLatestTwitterVerificationDB, addTwitterVerificationDB, getTwitterTokensDB, saveTwitterTokensDB } from '../../../db/client'
+import { getLatestTwitterVerificationDB, addTwitterVerificationDB, getTwitterTokensDB, saveTwitterTokensDB, syncTwitterVerificationsToSocialFi } from '../../../db/client'
 import { getLatestTwitterVerificationMem, getTwitterTokens, saveTwitterTokens, upsertTwitterVerificationMem } from '../../../lib/memdb'
 import { cookies } from 'next/headers'
 
@@ -101,6 +101,14 @@ export async function POST(req: Request) {
     upsertTwitterVerificationMem({ walletId: address, twitterUserId: userId, handle, followedJoinFroggys: followed, ribbitTweeted: !!tweetId, ribbitTweetId: tweetId || undefined, points, verifiedAt: Date.now() })
     try {
       await addTwitterVerificationDB({ walletId: address, twitterUserId: userId, handle, followedJoinFroggys: followed, ribbitTweeted: !!tweetId, ribbitTweetId: tweetId || undefined, points, verifiedAt: new Date() })
+      
+      // Automatically sync to leaderboard tables
+      try {
+        await syncTwitterVerificationsToSocialFi()
+        console.log('Successfully synced Twitter verification to leaderboard (recheck)')
+      } catch (syncError: any) {
+        console.error('Sync to leaderboard failed (non-fatal):', syncError)
+      }
     } catch (e: any) {
       // swallow; client will still get immediate status from response body
     }
