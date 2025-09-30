@@ -6,7 +6,7 @@ import SiteHeader from './components/SiteHeader'
 
 export const metadata: Metadata = {
   title: 'Bitcoin Frogs',
-  description: 'Trust-minimized holder verification and blazing fast gallery',
+  description: 'RIBBIT',
   icons: {
     icon: '/frogs/favicon.png',
     shortcut: '/frogs/favicon.png',
