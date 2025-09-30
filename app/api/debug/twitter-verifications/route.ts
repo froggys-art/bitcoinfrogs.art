@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     
     return NextResponse.json({
       count: verifications.length,
-      verifications: verifications.map(v => ({
+      verifications: verifications.map((v: any) => ({
         id: v.id,
         walletId: v.walletId,
         twitterUserId: v.twitterUserId,
