@@ -1,96 +1,58 @@
 import { NextResponse } from 'next/server'
-import { getTwitterConfig, refreshAccessToken, getCurrentUser, getUserByUsername, isFollowing, findRecentTweetContaining } from '../../../lib/twitter'
+import { getTwitterConfig, appGetUserByUsername, appIsFollowing, appFindRecentTweetContaining } from '../../../lib/twitter'
 import { getLatestTwitterVerificationDB, addTwitterVerificationDB, getTwitterTokensDB, saveTwitterTokensDB } from '../../../db/client'
 import { getLatestTwitterVerificationMem, getTwitterTokens, saveTwitterTokens, upsertTwitterVerificationMem } from '../../../lib/memdb'
-import { cookies } from 'next/headers'
 
 export async function POST(req: Request) {
   try {
     const { address } = await req.json()
     if (!address || typeof address !== 'string') return NextResponse.json({ error: 'address required' }, { status: 400 })
 
-    const { clientId, appHandle, requiredPhrase } = getTwitterConfig()
+    const { appHandle, requiredPhrase } = getTwitterConfig()
 
-    // Retrieve tokens
-    let tokens = getTwitterTokens(address)
-    if (!tokens) {
-      const row = await getTwitterTokensDB(address)
-      if (row?.accessToken) {
-        tokens = {
-          accessToken: row.accessToken as string,
-          refreshToken: (row as any).refreshToken || undefined,
-          expiresAt: row.expiresAt ? new Date(row.expiresAt as any).getTime() : undefined,
-        }
-        saveTwitterTokens(address, tokens)
+    // Get the user's Twitter handle from stored tokens/verification
+    let handle: string | undefined
+    let userId: string | undefined
+
+    // Try to get from stored tokens first
+    const tokens = await getTwitterTokensDB(address)
+    if (tokens?.accessToken) {
+      // We have tokens but won't use them - just need to get the handle
+      const latestVerif = await getLatestTwitterVerificationDB(address)
+      if (latestVerif?.handle && latestVerif?.twitterUserId) {
+        handle = latestVerif.handle
+        userId = latestVerif.twitterUserId
       }
     }
-    if (!tokens) {
-      // Fallback to cookie set at callback
-      try {
-        const xtok = cookies().get('xtok')?.value
-        if (xtok) {
-          const parsed = JSON.parse(decodeURIComponent(xtok)) as {
-            walletId: string
-            accessToken: string
-            refreshToken?: string
-            expiresAt?: number
-          }
-          if (parsed?.walletId === address && parsed.accessToken) {
-            tokens = {
-              accessToken: parsed.accessToken,
-              refreshToken: parsed.refreshToken,
-              expiresAt: parsed.expiresAt,
-            }
-            saveTwitterTokens(address, tokens)
-            await saveTwitterTokensDB({
-              walletId: address,
-              accessToken: tokens.accessToken,
-              refreshToken: tokens.refreshToken,
-              expiresAt: tokens.expiresAt ? new Date(tokens.expiresAt) : undefined,
-            })
-          }
-        }
-      } catch {}
-    }
-    if (!tokens) return NextResponse.json({ error: 'not_connected' }, { status: 400 })
 
-    // Refresh if expired/near-expiry and we have a refresh token
-    const now = Date.now()
-    if (tokens.expiresAt && tokens.expiresAt - now < 60_000 && tokens.refreshToken) {
-      try {
-        const refreshed = await refreshAccessToken({ clientId, refreshToken: tokens.refreshToken })
-        tokens = {
-          accessToken: refreshed.access_token,
-          refreshToken: refreshed.refresh_token || tokens.refreshToken,
-          expiresAt: Date.now() + (Number(refreshed.expires_in || 0) * 1000),
-        }
-        saveTwitterTokens(address, tokens)
-        await saveTwitterTokensDB({
-          walletId: address,
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-          expiresAt: tokens.expiresAt ? new Date(tokens.expiresAt) : undefined,
-        })
-      } catch {}
+    // If we don't have handle/userId, check memory
+    if (!handle || !userId) {
+      const memVerif = getLatestTwitterVerificationMem(address)
+      if (memVerif?.handle && memVerif?.twitterUserId) {
+        handle = memVerif.handle
+        userId = memVerif.twitterUserId
+      }
     }
 
-    // Re-check follow and tweet
-    const me = await getCurrentUser(tokens.accessToken)
-    const userId = me.data.id
-    const handle = me.data.username
+    if (!handle || !userId) {
+      return NextResponse.json({ error: 'not_connected', message: 'Please connect your Twitter account first' }, { status: 400 })
+    }
 
+    // Use App-Only authentication (Bearer token) for checks
     let followed = false
     let tweetId: string | null = null
     let followErr: string | null = null
     let tweetErr: string | null = null
+
     try {
-      const target = await getUserByUsername(tokens.accessToken, appHandle)
-      followed = await isFollowing(tokens.accessToken, userId, target.data.id)
+      const target = await appGetUserByUsername(appHandle)
+      followed = await appIsFollowing(userId, target.data.id)
     } catch (e: any) {
       followErr = e?.message || 'follow_check_failed'
     }
+
     try {
-      tweetId = await findRecentTweetContaining(tokens.accessToken, userId, requiredPhrase)
+      tweetId = await appFindRecentTweetContaining(handle, requiredPhrase)
     } catch (e: any) {
       tweetErr = e?.message || 'tweet_check_failed'
     }

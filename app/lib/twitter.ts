@@ -222,3 +222,37 @@ export async function repliedRibbitToTargetTweetApp(handle: string, targetTweetI
   const res = await appSearchTweets(q, { max_results: 10 })
   return res.data?.[0] ? { tweet_id: res.data[0].id } : null
 }
+
+// App-only: Check if a user follows a target (using Bearer token)
+export async function appIsFollowing(sourceUserId: string, targetUserId: string, maxPages = 5) {
+  const bearer = getBearerToken()
+  if (!bearer) throw new Error('Missing TWITTER_BEARER_TOKEN')
+  
+  let nextToken: string | undefined = undefined
+  for (let page = 0; page < maxPages; page++) {
+    const url = new URL(`${API_BASE}/2/users/${sourceUserId}/following`)
+    url.searchParams.set('max_results', '1000')
+    url.searchParams.set('user.fields', 'username')
+    if (nextToken) url.searchParams.set('pagination_token', nextToken)
+    
+    const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${bearer}` } })
+    if (!res.ok) {
+      let body: string
+      try { body = await res.text() } catch { body = '' }
+      throw new Error(`app_get_following_failed: ${res.status} ${body}`)
+    }
+    
+    const j = (await res.json()) as { data?: Array<{ id: string; username: string }>; meta?: { next_token?: string } }
+    if (j.data?.some((u) => u.id === targetUserId)) return true
+    nextToken = j.meta?.next_token
+    if (!nextToken) break
+  }
+  return false
+}
+
+// App-only: Find recent tweet containing a term (using Bearer token + search)
+export async function appFindRecentTweetContaining(handle: string, term: string) {
+  const q = `from:${handle} ${term} -is:retweet`
+  const res = await appSearchTweets(q, { max_results: 10 })
+  return res.data?.[0]?.id || null
+}
