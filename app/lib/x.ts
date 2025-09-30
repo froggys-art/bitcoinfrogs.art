@@ -31,8 +31,8 @@ export function generateState(): string {
 // Build X OAuth URL
 export function buildAuthUrl(state: string, codeChallenge: string): string {
   const { clientId } = getXConfig()
-  // Use old callback for compatibility
-  const redirectUri = process.env.X_REDIRECT_URI?.replace('/api/auth/x/callback', '/api/x/callback') || 'http://localhost:3000/api/x/callback'
+  // Use twitter callback for compatibility with existing X app settings
+  const redirectUri = process.env.X_REDIRECT_URI?.replace('/api/auth/x/callback', '/api/twitter/callback') || 'http://localhost:3000/api/twitter/callback'
   
   const params = new URLSearchParams({
     response_type: 'code',
