@@ -198,3 +198,54 @@ export async function findRecentTweetWithPhrase(accessToken: string, userId: str
   
   return null
 }
+
+// Bearer token functions for scanning (app-only auth)
+function getBearerToken(): string {
+  return process.env.TWITTER_BEARER_TOKEN || process.env.X_BEARER_TOKEN || ''
+}
+
+// App-only: Search for tweets
+async function searchTweets(query: string, options: { start_time?: string; max_results?: number } = {}) {
+  const bearer = getBearerToken()
+  if (!bearer) throw new Error('Missing TWITTER_BEARER_TOKEN')
+  
+  const url = new URL('https://api.twitter.com/2/tweets/search/recent')
+  url.searchParams.set('query', query)
+  url.searchParams.set('tweet.fields', 'author_id,created_at,conversation_id')
+  if (options.start_time) url.searchParams.set('start_time', options.start_time)
+  if (options.max_results) url.searchParams.set('max_results', String(options.max_results))
+  
+  const response = await fetch(url.toString(), {
+    headers: { 'Authorization': `Bearer ${bearer}` }
+  })
+  
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Search tweets failed: ${response.status} ${error}`)
+  }
+  
+  return await response.json() as {
+    data?: Array<{ id: string; text: string; created_at: string; conversation_id?: string }>
+    meta?: any
+  }
+}
+
+// Find RIBBIT tweet from user
+export async function findRibbitTweetApp(handle: string, since?: Date) {
+  const query = `from:${handle} (ribbit OR RIBBIT OR Ribbit) -is:retweet`
+  const result = await searchTweets(query, {
+    start_time: since ? since.toISOString() : undefined,
+    max_results: 10
+  })
+  return result.data?.[0] || null
+}
+
+// Find RIBBIT tweet mentioning target
+export async function findRibbitTaggedTweetApp(handle: string, target: string, since?: Date) {
+  const query = `from:${handle} (@${target}) (ribbit OR RIBBIT OR Ribbit) -is:retweet`
+  const result = await searchTweets(query, {
+    start_time: since ? since.toISOString() : undefined,
+    max_results: 10
+  })
+  return result.data?.[0] || null
+}
