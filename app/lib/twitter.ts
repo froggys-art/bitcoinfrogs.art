@@ -17,6 +17,10 @@ export const getTwitterConfig = getXConfig
 
 const API_BASE = (process.env.X_API_BASE || 'https://api.x.com').replace(/\/$/, '')
 
+function getBearerToken() {
+  return process.env.TWITTER_BEARER_TOKEN || process.env.X_BEARER_TOKEN || ''
+}
+
 export async function refreshAccessToken(opts: { clientId: string; refreshToken: string }) {
   const body = new URLSearchParams()
   body.set('client_id', opts.clientId)
@@ -163,4 +167,50 @@ export async function findRecentTweetContaining(accessToken: string, userId: str
     if (!nextToken) break
   }
   return null
+}
+
+// ---------------- App-only (Bearer) helpers ----------------
+export async function appGetUserByUsername(username: string) {
+  const bearer = getBearerToken()
+  if (!bearer) throw new Error('Missing TWITTER_BEARER_TOKEN')
+  const res = await fetch(`${API_BASE}/2/users/by/username/${encodeURIComponent(username)}?user.fields=username`, {
+    headers: { Authorization: `Bearer ${bearer}` },
+  })
+  if (!res.ok) throw new Error('app_get_user_by_username_failed')
+  return (await res.json()) as { data: { id: string; username: string } }
+}
+
+type SearchOpts = { start_time?: string; max_results?: number }
+export async function appSearchTweets(query: string, opts: SearchOpts = {}) {
+  const bearer = getBearerToken()
+  if (!bearer) throw new Error('Missing TWITTER_BEARER_TOKEN')
+  const url = new URL(`${API_BASE}/2/tweets/search/recent`)
+  url.searchParams.set('query', query)
+  url.searchParams.set('tweet.fields', 'author_id,created_at,conversation_id,entities,referenced_tweets')
+  if (opts.start_time) url.searchParams.set('start_time', opts.start_time)
+  if (opts.max_results) url.searchParams.set('max_results', String(opts.max_results))
+  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${bearer}` } })
+  if (!res.ok) {
+    const t = await res.text().catch(() => '')
+    throw new Error(`app_search_failed: ${res.status} ${t}`)
+  }
+  return (await res.json()) as { data?: Array<{ id: string; text: string; created_at: string; conversation_id?: string }>; meta?: any }
+}
+
+export async function findRibbitTweetApp(handle: string, since?: Date) {
+  const q = `from:${handle} (ribbit OR RIBBIT OR Ribbit) -is:retweet`
+  const res = await appSearchTweets(q, { start_time: since ? since.toISOString() : undefined, max_results: 10 })
+  return res.data?.[0] || null
+}
+
+export async function findRibbitTaggedTweetApp(handle: string, target: string, since?: Date) {
+  const q = `from:${handle} (@${target}) (ribbit OR RIBBIT OR Ribbit) -is:retweet`
+  const res = await appSearchTweets(q, { start_time: since ? since.toISOString() : undefined, max_results: 10 })
+  return res.data?.[0] || null
+}
+
+export async function repliedRibbitToTargetTweetApp(handle: string, targetTweetId: string) {
+  const q = `conversation_id:${targetTweetId} from:${handle} (ribbit OR RIBBIT OR Ribbit)`
+  const res = await appSearchTweets(q, { max_results: 10 })
+  return res.data?.[0] ? { tweet_id: res.data[0].id } : null
 }

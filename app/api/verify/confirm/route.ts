@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { addVerification, claimFrogsForWalletMem, logEvent, upsertWallet } from '../../../lib/memdb'
-import { addVerificationDB, claimFrogsForWalletDB, logEventDB, upsertWalletDB } from '../../../db/client'
+import { addVerificationDB, claimFrogsForWalletDB, logEventDB, upsertWalletDB, markUsersVerifiedByWalletDB } from '../../../db/client'
 
 export async function POST(req: Request) {
   try {
@@ -37,6 +37,9 @@ export async function POST(req: Request) {
       reservedText,
       verifiedAt: new Date(),
     })
+    try {
+      await markUsersVerifiedByWalletDB(address)
+    } catch {}
     return NextResponse.json({ ok: true, verificationId: id || v.id })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'failed' }, { status: 500 })

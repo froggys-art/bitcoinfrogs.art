@@ -1,7 +1,7 @@
 import { Pool } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { wallets, verifications, auditLogs, verifySessions, claims, twitterVerifications, twitterTokens } from './schema'
-import { and, eq } from 'drizzle-orm'
+import { wallets, verifications, auditLogs, verifySessions, claims, twitterVerifications, twitterTokens, users, leaderboard, scoreEvents } from './schema'
+import { and, eq, gt, sql } from 'drizzle-orm'
 
 const DATABASE_URL = process.env.DATABASE_URL
 
@@ -159,4 +159,164 @@ export async function claimFrogsForWalletDB(walletId: string, frogNums: number[]
     if (owner && owner !== walletId) conflicts.push(n)
   }
   return { conflicts }
+}
+
+// ---------------- Social-Fi: Users & Leaderboard helpers ----------------
+
+export async function upsertUserDB(params: {
+  twitterUserId: string
+  twitterHandle: string
+  twitterName?: string
+  twitterAvatarUrl?: string
+  walletId?: string
+  accessToken?: string
+  refreshToken?: string
+  tokenExpiresAt?: Date
+}) {
+  if (!db) return
+  const now = new Date()
+  await db
+    .insert(users)
+    .values({
+      id: params.twitterUserId,
+      createdAt: now,
+      updatedAt: now,
+      walletId: params.walletId,
+      twitterUserId: params.twitterUserId,
+      twitterHandle: params.twitterHandle,
+      twitterName: params.twitterName,
+      twitterAvatarUrl: params.twitterAvatarUrl,
+      accessToken: params.accessToken,
+      refreshToken: params.refreshToken,
+      tokenExpiresAt: params.tokenExpiresAt,
+    })
+    .onConflictDoUpdate({
+      target: users.id,
+      set: {
+        updatedAt: now,
+        walletId: params.walletId ?? sql`COALESCE(${users.walletId}, ${params.walletId})`,
+        twitterHandle: params.twitterHandle,
+        twitterName: params.twitterName,
+        twitterAvatarUrl: params.twitterAvatarUrl,
+        accessToken: params.accessToken ?? sql`${users.accessToken}`,
+        refreshToken: params.refreshToken ?? sql`${users.refreshToken}`,
+        tokenExpiresAt: params.tokenExpiresAt ?? sql`${users.tokenExpiresAt}`,
+      },
+    })
+}
+
+export async function markUsersVerifiedByWalletDB(walletId: string) {
+  if (!db) return
+  const now = new Date()
+  // Mark all users linked to wallet as verified
+  await db.update(users).set({ isVerified: true, verifiedAt: now, updatedAt: now }).where(eq(users.walletId, walletId))
+}
+
+export async function ensureLeaderboardRowDB(userId: string) {
+  if (!db) return
+  const now = new Date()
+  await db
+    .insert(leaderboard)
+    .values({ id: userId, userId, points: 0, createdAt: now, updatedAt: now })
+    .onConflictDoNothing()
+}
+
+export async function hasScoreEventDB(userId: string, type: string) {
+  if (!db) return false
+  const rows = await db.select().from(scoreEvents).where(and(eq(scoreEvents.userId, userId), eq(scoreEvents.type, type))).limit(1)
+  return !!rows[0]
+}
+
+export async function alreadyAwardedInWindowDB(userId: string, type: string, since: Date) {
+  if (!db) return false
+  const rows = await db
+    .select()
+    .from(scoreEvents)
+    .where(and(eq(scoreEvents.userId, userId), eq(scoreEvents.type, type), gt(scoreEvents.createdAt as any, since)))
+    .limit(1)
+  return !!rows[0]
+}
+
+export async function awardPointsDB(userId: string, type: 'follow_ok' | 'reply_ok' | 'ribbit' | 'ribbit_tag', delta: number, opts?: { tweetId?: string; notes?: string }) {
+  if (!db) return
+  const now = new Date()
+  await db.transaction(async (tx: any) => {
+    const id = `${userId}:${type}:${Date.now()}`
+    await tx.insert(scoreEvents).values({ id, userId, type, delta, tweetId: opts?.tweetId, notes: opts?.notes, createdAt: now })
+    // increment points
+    await tx
+      .update(leaderboard)
+      .set({ points: sql`${leaderboard.points} + ${delta}`, updatedAt: now })
+      .where(eq(leaderboard.userId, userId))
+  })
+}
+
+export async function getLeaderboardPageDB(limit = 100, offset = 0) {
+  if (!db) return { rows: [], nextOffset: undefined as number | undefined }
+  const rows = (await db.execute(sql`
+    SELECT u.twitter_handle AS handle, l.points
+    FROM ${leaderboard} l
+    JOIN ${users} u ON u.id = l.user_id
+    ORDER BY l.points DESC, l.updated_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `)) as any
+  const arr: Array<{ handle: string; points: number }> = rows?.rows || []
+  const nextOffset = arr.length === limit ? offset + limit : undefined
+  return { rows: arr, nextOffset }
+}
+
+export async function getLeaderboardMeDB(userId: string) {
+  if (!db) return null
+  const myRows = await db.execute(sql`
+    SELECT l.points, l.updated_at, l.last_scan_at, u.twitter_handle AS handle
+    FROM ${leaderboard} l JOIN ${users} u ON u.id = l.user_id
+    WHERE l.user_id = ${userId}
+    LIMIT 1
+  `)
+  const my = (myRows as any)?.rows?.[0]
+  if (!my) return null
+  const aheadRows = await db.execute(sql`
+    SELECT COUNT(*) AS ahead
+    FROM ${leaderboard} l2
+    WHERE (l2.points > ${my.points}) OR (l2.points = ${my.points} AND l2.updated_at > ${my.updated_at})
+  `)
+  const ahead = Number((aheadRows as any)?.rows?.[0]?.ahead || 0)
+  return { handle: my.handle as string, points: Number(my.points), rank: ahead + 1, lastScanAt: my.last_scan_at ? new Date(my.last_scan_at as any).toISOString() : undefined }
+}
+
+export async function getVerifiedUsersForScanDB() {
+  if (!db) return [] as Array<{ id: string; handle: string }>
+  const rows = await db.execute(sql`
+    SELECT id, twitter_handle AS handle
+    FROM ${users}
+    WHERE is_verified = true
+  `)
+  const arr = ((rows as any)?.rows || []) as Array<{ id: string; handle: string }>
+  return arr
+}
+
+export async function getUserIdByHandleDB(handle: string) {
+  if (!db) return null
+  const rows = await db.select().from(users).where(eq(users.twitterHandle, handle)).limit(1)
+  return rows[0]?.id || null
+}
+
+export async function getUserIdsByWalletDB(walletId: string) {
+  if (!db) return [] as string[]
+  const rows = await db.select({ id: users.id }).from(users).where(eq(users.walletId, walletId))
+  return rows.map((r: any) => r.id as string)
+}
+
+export async function updateLeaderboardScanMarksDB(userId: string, data: { lastScanAt?: Date; lastRibbitAt?: Date; lastTaggedRibbitAt?: Date }) {
+  if (!db) return
+  const now = new Date()
+  await db
+    .update(leaderboard)
+    .set({
+      updatedAt: now,
+      lastScanAt: data.lastScanAt ?? (sql`${leaderboard.lastScanAt}` as any),
+      lastRibbitAt: data.lastRibbitAt ?? (sql`${leaderboard.lastRibbitAt}` as any),
+      lastTaggedRibbitAt: data.lastTaggedRibbitAt ?? (sql`${leaderboard.lastTaggedRibbitAt}` as any),
+    })
+    .where(eq(leaderboard.userId, userId))
 }

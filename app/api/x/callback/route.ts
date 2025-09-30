@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { exchangeCodeForToken, getTwitterConfig, getUserByUsername, isFollowing, findRecentTweetContaining, getCurrentUser } from '../../../lib/twitter'
-import { addTwitterVerificationDB, logEventDB, saveTwitterTokensDB, upsertWalletDB } from '../../../db/client'
+import { exchangeCodeForToken, getTwitterConfig, getUserByUsername, isFollowing, findRecentTweetContaining, getCurrentUser, repliedRibbitToTargetTweetApp } from '../../../lib/twitter'
+import { addTwitterVerificationDB, logEventDB, saveTwitterTokensDB, upsertWalletDB, upsertUserDB, ensureLeaderboardRowDB, hasScoreEventDB, awardPointsDB } from '../../../db/client'
 import { logEvent, popTwitterOAuthState, saveTwitterTokens, upsertTwitterVerificationMem, upsertWallet } from '../../../lib/memdb'
 import { cookies } from 'next/headers'
 
@@ -80,6 +80,26 @@ export async function GET(req: Request) {
       upsertTwitterVerificationMem({ walletId: stateObj.walletId, twitterUserId: userId, handle, followedJoinFroggys: followed, ribbitTweeted: !!tweetId, ribbitTweetId: tweetId || undefined, points, verifiedAt: Date.now() })
       try {
         await addTwitterVerificationDB({ walletId: stateObj.walletId, twitterUserId: userId, handle, followedJoinFroggys: followed, ribbitTweeted: !!tweetId, ribbitTweetId: tweetId || undefined, points, verifiedAt: new Date() })
+      } catch {}
+
+      // Leaderboard: upsert user, ensure row, and award one-time points
+      try {
+        await upsertUserDB({ twitterUserId: userId, twitterHandle: handle, walletId: stateObj.walletId })
+        await ensureLeaderboardRowDB(userId)
+        if (followed && !(await hasScoreEventDB(userId, 'follow_ok'))) {
+          await awardPointsDB(userId, 'follow_ok', 1)
+        }
+        const targetTweetId = process.env.TARGET_TWEET_ID
+        let replyOkTweetId: string | null = null
+        if (targetTweetId) {
+          try {
+            const rep = await repliedRibbitToTargetTweetApp(handle, targetTweetId)
+            replyOkTweetId = rep?.tweet_id || null
+          } catch {}
+        }
+        if (replyOkTweetId && !(await hasScoreEventDB(userId, 'reply_ok'))) {
+          await awardPointsDB(userId, 'reply_ok', 1, { tweetId: replyOkTweetId })
+        }
       } catch {}
 
       logEvent('x_callback', { walletId: stateObj.walletId, handle, followed, tweetId })

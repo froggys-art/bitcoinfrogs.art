@@ -70,3 +70,54 @@ export const twitterTokens = pgTable('twitter_tokens', {
   expiresAt: timestamp('expires_at', { withTimezone: false }),
   updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull(),
 })
+
+// --- Social-Fi: Users (Twitter) ---
+// Note: We use twitter_user_id (string) as the primary key for simplicity.
+export const users = pgTable('users', {
+  id: varchar('id', { length: 60 }).primaryKey(), // twitter_user_id
+  createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull(),
+
+  // Optional associations
+  walletId: varchar('wallet_id', { length: 100 }), // local wallet address, if linked
+
+  // Twitter profile
+  twitterUserId: varchar('twitter_user_id', { length: 60 }).notNull(), // duplicate of id for clarity
+  twitterHandle: varchar('twitter_handle', { length: 50 }).notNull(),
+  twitterName: varchar('twitter_name', { length: 100 }),
+  twitterAvatarUrl: text('twitter_avatar_url'),
+
+  // OAuth tokens (optional; only if needed)
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  tokenExpiresAt: timestamp('token_expires_at', { withTimezone: false }),
+
+  // Verification state (site-level verification)
+  isVerified: boolean('is_verified').notNull().default(false),
+  verifiedAt: timestamp('verified_at', { withTimezone: false }),
+})
+
+// --- Social-Fi: Leaderboard ---
+export const leaderboard = pgTable('leaderboard', {
+  id: varchar('id', { length: 120 }).primaryKey(), // `${user_id}`
+  createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: false }).defaultNow().notNull(),
+
+  userId: varchar('user_id', { length: 60 }).notNull(), // references users.id
+  points: integer('points').notNull().default(0),
+  lastScanAt: timestamp('last_scan_at', { withTimezone: false }),
+  lastRibbitAt: timestamp('last_ribbit_at', { withTimezone: false }),
+  lastTaggedRibbitAt: timestamp('last_tagged_ribbit_at', { withTimezone: false }),
+})
+
+// --- Social-Fi: Score Events (audit trail + idempotency) ---
+export const scoreEvents = pgTable('score_events', {
+  id: varchar('id', { length: 140 }).primaryKey(),
+  createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
+
+  userId: varchar('user_id', { length: 60 }).notNull(), // references users.id
+  type: varchar('type', { length: 40 }).notNull(), // 'follow_ok' | 'reply_ok' | 'ribbit' | 'ribbit_tag'
+  delta: integer('delta').notNull(),
+  tweetId: varchar('tweet_id', { length: 60 }),
+  notes: text('notes'),
+})
