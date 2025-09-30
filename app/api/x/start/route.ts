@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getXConfig, genRandomUrlSafe, sha256Base64Url, buildAuthUrl } from '../../../lib/twitter'
 import { cookies } from 'next/headers'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url)

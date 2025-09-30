@@ -4,6 +4,8 @@ import { addTwitterVerificationDB, saveTwitterTokensDB } from '../../../db/clien
 import { saveTwitterTokens, upsertTwitterVerificationMem } from '../../../lib/memdb'
 import { cookies } from 'next/headers'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
