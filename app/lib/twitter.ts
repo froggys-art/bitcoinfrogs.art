@@ -141,7 +141,11 @@ export async function isFollowing(accessToken: string, sourceUserId: string, tar
     url.searchParams.set('user.fields', 'username')
     if (nextToken) url.searchParams.set('pagination_token', nextToken)
     const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${accessToken}` } })
-    if (!res.ok) throw new Error('get_following_failed')
+    if (!res.ok) {
+      let body: string
+      try { body = await res.text() } catch { body = '' }
+      throw new Error(`get_following_failed: ${res.status} ${body}`)
+    }
     const j = (await res.json()) as { data?: Array<{ id: string; username: string }>; meta?: { next_token?: string } }
     if (j.data?.some((u) => u.id === targetUserId)) return true
     nextToken = j.meta?.next_token
@@ -159,7 +163,11 @@ export async function findRecentTweetContaining(accessToken: string, userId: str
     url.searchParams.set('tweet.fields', 'created_at')
     if (nextToken) url.searchParams.set('pagination_token', nextToken)
     const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${accessToken}` } })
-    if (!res.ok) throw new Error('get_user_tweets_failed')
+    if (!res.ok) {
+      let body: string
+      try { body = await res.text() } catch { body = '' }
+      throw new Error(`get_user_tweets_failed: ${res.status} ${body}`)
+    }
     const j = (await res.json()) as { data?: Array<{ id: string; text: string }>; meta?: { next_token?: string } }
     const found = j.data?.find((tw) => (tw.text || '').toLowerCase().includes(t))
     if (found) return found.id
