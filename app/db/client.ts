@@ -1,7 +1,7 @@
 import { Pool } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { wallets, verifications, auditLogs, verifySessions, claims, twitterVerifications, twitterTokens, users, leaderboard, scoreEvents } from './schema'
-import { and, eq, gt, sql } from 'drizzle-orm'
+import { and, eq, gt, sql, isNotNull } from 'drizzle-orm'
 
 const DATABASE_URL = process.env.DATABASE_URL
 
@@ -319,4 +319,85 @@ export async function updateLeaderboardScanMarksDB(userId: string, data: { lastS
       lastTaggedRibbitAt: data.lastTaggedRibbitAt ?? (sql`${leaderboard.lastTaggedRibbitAt}` as any),
     })
     .where(eq(leaderboard.userId, userId))
+}
+
+// Sync function to migrate twitterVerifications data to Social-Fi tables
+export async function syncTwitterVerificationsToSocialFi() {
+  if (!db) return { synced: 0, errors: 0 }
+  
+  let synced = 0
+  let errors = 0
+  
+  try {
+    // Get all Twitter verifications with valid data
+    const verifications = await db
+      .select()
+      .from(twitterVerifications)
+      .where(and(
+        isNotNull(twitterVerifications.twitterUserId),
+        isNotNull(twitterVerifications.handle),
+        isNotNull(twitterVerifications.points)
+      ))
+    
+    for (const verification of verifications) {
+      try {
+        const now = new Date()
+        const userId = verification.twitterUserId!
+        const handle = verification.handle!
+        const points = verification.points || 0
+        
+        // Insert or update user record
+        await db
+          .insert(users)
+          .values({
+            id: userId,
+            twitterUserId: userId,
+            twitterHandle: handle,
+            walletId: verification.walletId,
+            isVerified: true,
+            verifiedAt: verification.verifiedAt || now,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: users.id,
+            set: {
+              twitterHandle: handle,
+              walletId: verification.walletId,
+              isVerified: true,
+              verifiedAt: verification.verifiedAt || now,
+              updatedAt: now,
+            },
+          })
+        
+        // Insert or update leaderboard record
+        await db
+          .insert(leaderboard)
+          .values({
+            id: userId,
+            userId,
+            points,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: leaderboard.id,
+            set: {
+              points,
+              updatedAt: now,
+            },
+          })
+        
+        synced++
+      } catch (e) {
+        console.error('Error syncing verification:', verification.id, e)
+        errors++
+      }
+    }
+    
+    return { synced, errors }
+  } catch (e: any) {
+    console.error('Error in syncTwitterVerificationsToSocialFi:', e)
+    return { synced, errors: errors + 1 }
+  }
 }
