@@ -3,6 +3,9 @@ import { exchangeCodeForTokens, getCurrentUser } from '../../../../lib/x'
 import { saveTwitterTokensDB, upsertWalletDB } from '../../../../db/client'
 import { oauthStates } from '../../../../lib/oauth-state'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url)

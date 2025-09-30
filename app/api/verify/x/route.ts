@@ -9,6 +9,9 @@ import {
   hasScoreEventDB 
 } from '../../../db/client'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: Request) {
   try {
     const { walletAddress } = await request.json()

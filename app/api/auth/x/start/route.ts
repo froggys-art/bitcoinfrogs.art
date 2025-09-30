@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { buildAuthUrl, generateCodeVerifier, generateCodeChallenge, generateState } from '../../../../lib/x'
 import { oauthStates, cleanupOldStates } from '../../../../lib/oauth-state'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: Request) {
   try {
     const { walletAddress } = await request.json()
