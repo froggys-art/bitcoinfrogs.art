@@ -10,20 +10,13 @@ import { useState, ReactNode } from 'react'
       const faqItems: FAQItem[] = [
         {
           question: "Why Bitcoin Frogs?",
-          answer: "Bitcoin Frogs are more than pixel art, they're one of the earliest and most culturally significant Ordinals collections. Minted in March 2023 as a free drop via the Lightning Network, they proved that community, memes, and art could thrive on the world's most secure blockchain. The frogs helped kick off Ordinals adoption, briefly flipped top Ethereum collections in daily volume, and left a permanent mark on Bitcoin's cultural history."
+          answer:
+            "Bitcoin Frogs are more than pixel art, they're one of the earliest and most culturally significant Ordinals collections. Minted in March 2023 as a free drop via the Lightning Network, they proved that community, memes, and art could thrive on the world's most secure blockchain. The frogs helped kick off Ordinals adoption, briefly flipped top Ethereum collections in daily volume, and left a permanent mark on Bitcoin's cultural history."
         },
         {
           question: "What is the verification for?",
-          answer: "The verification is for a [REDACTED] process linked to verified Bitcoin Frogs holders. It confirms your place in the original collection and ensures eligibility for any future initiatives tied to verified frogs."
-        },
-        {
-          question: "Is there a Bitcoin Frogs Strategy or Treasury coming?",
-          answer: (
-            <>
-              Bitcoin Frogs launched without a roadmap, token, or central treasury, making it a pure community-driven collection from the start. We can't share much at this time, but the hint is simple: RIBBIT -{' '}
-              <a href="https://ribbit.auction" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">https://ribbit.auction</a>
-            </>
-          )
+          answer:
+            "The verification is for a [REDACTED] process linked to verified Bitcoin Frogs holders. It confirms your place in the original collection and ensures eligibility for any future initiatives tied to verified frogs."
         },
         {
           question: "What's next?",
