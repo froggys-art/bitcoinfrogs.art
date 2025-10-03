@@ -355,6 +355,31 @@ export default function VerifyPanel() {
     }
   }, [])
 
+  // Try to open the X/Twitter mobile app for Follow; fallback to web intent
+  const openXFollow = useCallback(() => {
+    const appUrl = 'twitter://user?screen_name=joinfroggys'
+    const webUrl = 'https://x.com/intent/follow?screen_name=joinfroggys'
+    let didNavigate = false
+
+    const t = setTimeout(() => {
+      if (!didNavigate) {
+        try { window.open(webUrl, '_blank', 'noopener,noreferrer') } catch { window.location.href = webUrl }
+      }
+    }, 700)
+
+    try {
+      // Attempt to open the native app
+      (window as any).location.href = appUrl
+      didNavigate = true
+    } catch {
+      // Fallback handled by timeout
+    } finally {
+      // Clear the timeout if page visibility changes (app likely opened)
+      const onVis = () => { try { clearTimeout(t) } catch {} document.removeEventListener('visibilitychange', onVis) }
+      document.addEventListener('visibilitychange', onVis)
+    }
+  }, [])
+
   const connectXverse = useCallback(async () => {
     setError(null)
     setLoading(true)
@@ -582,7 +607,7 @@ export default function VerifyPanel() {
               </div>
             )}
             <div className="mt-2 flex items-center justify-center gap-2 text-[11px]">
-              <a className="underline hover:opacity-80" href="https://x.com/joinfroggys" target="_blank" rel="noopener noreferrer">Follow</a>
+              <button type="button" onClick={openXFollow} className="underline hover:opacity-80">Follow</button>
               <span>·</span>
               <a className="underline hover:opacity-80" href={
                 `https://x.com/intent/tweet?text=${encodeURIComponent("Believe it or not, @BitcoinFrogs and Ordinals are still undervalued.\n\nHere's why: https://bitcoinfrogs.art\n\nRIBBIT")}`
