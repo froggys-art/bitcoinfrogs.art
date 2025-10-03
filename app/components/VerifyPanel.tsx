@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useCallback, useEffect, useState } from 'react'
 import { getAddress, signMessage as xverseSignMessage, AddressPurpose, BitcoinNetworkType } from '@sats-connect/core'
@@ -585,7 +585,7 @@ export default function VerifyPanel() {
               <a className="underline hover:opacity-80" href="https://x.com/joinfroggys" target="_blank" rel="noopener noreferrer">Follow</a>
               <span>·</span>
               <a className="underline hover:opacity-80" href={
-                `https://x.com/intent/tweet?text=${encodeURIComponent("Believe it or not, @BitcoinFrogs are still undervalued. Here's why: https://www.bitcoinfrogs.art")}`
+                `https://x.com/intent/tweet?text=${encodeURIComponent("Believe it or not, @BitcoinFrogs and Ordinals are still undervalued.\n\nHere's why: https://bitcoinfrogs.art\n\nRIBBIT")}`
               } target="_blank" rel="noopener noreferrer">Tweet</a>
             </div>
           </div>
