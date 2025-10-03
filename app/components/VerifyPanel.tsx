@@ -108,6 +108,14 @@ export default function VerifyPanel() {
       const ok = url.searchParams.get('x')
       if (ok === 'ok' && address) {
         fetchTwitterStatus(address)
+        // Auto-open tweet composer per request, with multiline content
+        try {
+          const tweetText = "RIBBIT!\n\nI just verified on https://www.bitcoinfrogs.art/\n\n🐸"
+          const intent = `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}`
+          // Prefer opening in a new tab; fallback to same-tab if blocked
+          const w = window.open(intent, '_blank', 'noopener,noreferrer')
+          if (!w) window.location.href = intent
+        } catch {}
         url.searchParams.delete('x')
         window.history.replaceState({}, '', url.pathname + (url.search ? `?${url.searchParams.toString()}` : '') + url.hash)
       }

@@ -141,8 +141,10 @@ export async function GET(req: Request) {
       maxAge: 86400 // 24 hours
     })
     
-    // Redirect back to the main page with success indicator and wallet address
-    return NextResponse.redirect(`${url.origin}/?x=ok&address=${encodeURIComponent(walletAddress)}`)
+    // Redirect to X Tweet composer with multiline post after successful connect
+    const tweetText = 'RIBBIT!\n\nI just verified on https://www.bitcoinfrogs.art/\n\n🐸'
+    const intentUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}`
+    return NextResponse.redirect(intentUrl)
   } catch (e: any) {
     console.error('X callback error:', e)
     const url = new URL(req.url)
