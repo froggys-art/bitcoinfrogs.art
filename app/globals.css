@@ -90,7 +90,14 @@ body {
 /* Mobile tuning: shrink hero frog image to avoid overlap with title/nav/footer */
 @media (max-width: 480px) {
   .frog-hero img {
-    width: 200px !important;
-    height: 200px !important;
+    width: 180px !important;
+    height: 180px !important;
+  }
+}
+
+/* Ensure proper centering on mobile */
+@media (max-width: 768px) {
+  .frog-hero {
+    margin: 0 auto;
   }
 }

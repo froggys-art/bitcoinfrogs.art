@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useCallback, useEffect, useState } from 'react'
 import { getAddress, signMessage as xverseSignMessage, AddressPurpose, BitcoinNetworkType } from '@sats-connect/core'
@@ -9,7 +9,7 @@ export default function VerifyPanel() {
   function shorten(addr?: string | null, p = 6, s = 6) {
     if (!addr) return ''
     if (addr.length <= p + s + 3) return addr
-    return `${addr.slice(0, p)}…${addr.slice(-s)}`
+    return `${addr.slice(0, p)}${addr.slice(-s)}`
   }
   const [provider, setProvider] = useState<Provider | null>(null)
   const [address, setAddress] = useState<string | null>(null)
@@ -46,7 +46,7 @@ export default function VerifyPanel() {
 
   const loadHoldings = useCallback(async (addr: string) => {
     try {
-      setStatus('Loading Bitcoin Frogs…')
+      setStatus('Loading Bitcoin Frogs')
       const res = await fetch(`/api/holdings?address=${encodeURIComponent(addr)}`)
       const j = await res.json()
       if (res.ok) {
@@ -54,7 +54,7 @@ export default function VerifyPanel() {
         setNumbers(Array.isArray(j?.numbers) ? j.numbers : [])
       }
     } finally {
-      setStatus((s) => (s === 'Loading Bitcoin Frogs…' ? null : s))
+      setStatus((s) => (s === 'Loading Bitcoin Frogs' ? null : s))
     }
   }, [])
 
@@ -83,7 +83,7 @@ export default function VerifyPanel() {
 
   const fetchTwitterStatus = useCallback(async (addr: string) => {
     try {
-      setStatus('Checking X status…')
+      setStatus('Checking X status')
       const res = await fetch(`/api/x/status?address=${encodeURIComponent(addr)}`, { credentials: 'include' as RequestCredentials })
       const j = await res.json()
       if (res.ok && j?.connected) {
@@ -97,7 +97,7 @@ export default function VerifyPanel() {
         })
       }
     } finally {
-      setStatus((s) => (s === 'Checking X status…' ? null : s))
+      setStatus((s) => (s === 'Checking X status' ? null : s))
     }
   }, [])
 
@@ -176,7 +176,7 @@ export default function VerifyPanel() {
     setError(null)
     setLoading(true)
     setProvider('unisat')
-    setStatus('Connecting to UniSat…')
+    setStatus('Connecting to UniSat')
     try {
       const api = (window as any).unisat as any
       if (!api) {
@@ -214,7 +214,7 @@ export default function VerifyPanel() {
       try { localStorage.setItem('bf_wallet_address', addr); localStorage.setItem('bf_wallet_provider', 'unisat') } catch {}
 
       // 1) Start verification to get server nonce/message
-      setStatus('Getting verification challenge…')
+      setStatus('Getting verification challenge')
       const res1 = await fetch('/api/verify/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -226,11 +226,11 @@ export default function VerifyPanel() {
 
       // 2) User signs the message
       if (!api.signMessage) throw new Error('Wallet does not support signMessage')
-      setStatus('Requesting wallet signature…')
+      setStatus('Requesting wallet signature')
       const signature = await api.signMessage(message)
 
       // 3) Complete verification (log signature for now)
-      setStatus('Verifying signature…')
+      setStatus('Verifying signature')
       const res2 = await fetch('/api/verify/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -241,7 +241,7 @@ export default function VerifyPanel() {
       setVerificationId(j2?.verificationId || null)
 
       // 4) Fetch holdings via free Hiro API
-      setStatus('Loading Bitcoin Frogs…')
+      setStatus('Loading Bitcoin Frogs')
       const res3 = await fetch(`/api/holdings?address=${encodeURIComponent(addr)}`)
       const j3 = await res3.json()
       if (!res3.ok) throw new Error(j3?.error || 'Holdings check failed')
@@ -282,7 +282,7 @@ export default function VerifyPanel() {
       setError('Connect your wallet first to link X')
       return
     }
-    setStatus('Redirecting to X…')
+    setStatus('Redirecting to X')
     window.location.href = `/api/x/start?address=${encodeURIComponent(address)}`
   }, [address])
 
@@ -290,7 +290,7 @@ export default function VerifyPanel() {
     setError(null)
     setLoading(true)
     setProvider('okx')
-    setStatus('Connecting to OKX Wallet…')
+    setStatus('Connecting to OKX Wallet')
     try {
       const api = (window as any).okxwallet?.bitcoin as any
       if (!api) {
@@ -321,7 +321,7 @@ export default function VerifyPanel() {
       setAddress(addr)
       try { localStorage.setItem('bf_wallet_address', addr); localStorage.setItem('bf_wallet_provider', 'okx') } catch {}
 
-      setStatus('Getting verification challenge…')
+      setStatus('Getting verification challenge')
       const res1 = await fetch('/api/verify/start', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address: addr, provider: 'okx' }),
@@ -330,10 +330,10 @@ export default function VerifyPanel() {
       const message: string = j1?.message
 
       if (!api.signMessage) throw new Error('Wallet does not support signMessage')
-      setStatus('Requesting wallet signature…')
+      setStatus('Requesting wallet signature')
       const signature = await api.signMessage(message)
 
-      setStatus('Verifying signature…')
+      setStatus('Verifying signature')
       const res2 = await fetch('/api/verify/complete', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address: addr, provider: 'okx', message, signature }),
@@ -341,7 +341,7 @@ export default function VerifyPanel() {
       const j2 = await res2.json(); if (!res2.ok) throw new Error(j2?.error || 'Verification failed')
       setVerificationId(j2?.verificationId || null)
 
-      setStatus('Loading Bitcoin Frogs…')
+      setStatus('Loading Bitcoin Frogs')
       const res3 = await fetch(`/api/holdings?address=${encodeURIComponent(addr)}`)
       const j3 = await res3.json(); if (!res3.ok) throw new Error(j3?.error || 'Holdings check failed')
       setHoldCount(typeof j3?.count === 'number' ? j3.count : 0)
@@ -359,7 +359,7 @@ export default function VerifyPanel() {
     setError(null)
     setLoading(true)
     setProvider('xverse')
-    setStatus('Connecting to Xverse…')
+    setStatus('Connecting to Xverse')
     try {
       // Prefer Sats Connect to avoid extension errors about purposes
       let ordAddress: string | null = null
@@ -367,7 +367,7 @@ export default function VerifyPanel() {
       const ord = (AddressPurpose as any)?.Ordinals || 'ordinals'
       const pay = (AddressPurpose as any)?.Payment || 'payment'
       const tries: Array<any[]> = [[ord], [pay], [ord, pay]]
-      setStatus('Requesting Xverse addresses…')
+      setStatus('Requesting Xverse addresses')
       for (const purposes of tries) {
         try {
           const addrResp: any = await scGetAddress(purposes)
@@ -407,7 +407,7 @@ export default function VerifyPanel() {
       if (!ordAddress) throw new Error('Xverse did not return an address. Please approve the connection popup, then try again.')
       // Helper: start->sign->complete for a specific address
       const attempt = async (addr: string): Promise<boolean> => {
-        setStatus('Getting verification challenge…')
+        setStatus('Getting verification challenge')
         const res1 = await fetch('/api/verify/start', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ address: addr, provider: 'xverse' }),
@@ -419,7 +419,7 @@ export default function VerifyPanel() {
         // Prefer BIP-322 for Taproot
         if (addr?.toLowerCase().startsWith('bc1p')) {
           try {
-            setStatus('Requesting wallet signature (BIP-322)…')
+            setStatus('Requesting wallet signature (BIP-322)')
             const webbtc: any = (window as any).btc || (window as any).BitcoinProvider
             if (webbtc?.request) {
               const resp = await webbtc.request('signMessage', { address: addr, message, type: 'bip322-simple' })
@@ -429,7 +429,7 @@ export default function VerifyPanel() {
         }
         if (!signature) {
           try {
-            setStatus('Requesting wallet signature…')
+            setStatus('Requesting wallet signature')
             const api = (window as any).xverseProviders?.bitcoin || (window as any).xverse?.bitcoin
             if (api?.signMessage) {
               signature = await api.signMessage(message)
@@ -438,7 +438,7 @@ export default function VerifyPanel() {
         }
         if (!signature) {
           try {
-            setStatus('Requesting wallet signature…')
+            setStatus('Requesting wallet signature')
             const webbtc: any = (window as any).btc || (window as any).BitcoinProvider
             if (webbtc?.request) {
               try {
@@ -453,14 +453,14 @@ export default function VerifyPanel() {
         }
         if (!signature) {
           try {
-            setStatus('Requesting wallet signature…')
+            setStatus('Requesting wallet signature')
             const signResp: any = await scSignMessage(addr, message)
             signature = signResp?.messageSignature || null
           } catch {}
         }
         if (!signature) return false
 
-        setStatus('Verifying signature…')
+        setStatus('Verifying signature')
         const res2 = await fetch('/api/verify/complete', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ address: addr, provider: 'xverse', message, signature }),
@@ -477,11 +477,11 @@ export default function VerifyPanel() {
       // Try Ordinals first; if signature invalid, try Payment
       let ok = false
       if (ordAddress) ok = await attempt(ordAddress)
-      if (!ok) setStatus('Retrying with payment address…')
+      if (!ok) setStatus('Retrying with payment address')
       if (!ok && payAddress && payAddress !== ordAddress) ok = await attempt(payAddress)
       if (!ok) throw new Error('Verification failed (Xverse)')
 
-      setStatus('Loading Bitcoin Frogs…')
+      setStatus('Loading Bitcoin Frogs')
       const res3 = await fetch(`/api/holdings?address=${encodeURIComponent((address || ordAddress || payAddress)!)}`)
       const j3 = await res3.json(); if (!res3.ok) throw new Error(j3?.error || 'Holdings check failed')
       setHoldCount(typeof j3?.count === 'number' ? j3.count : 0)
@@ -535,13 +535,13 @@ export default function VerifyPanel() {
       {!address ? (
         <div className="space-y-2 font-press text-[12px]">
           <button onClick={hasOKX ? connectOKX : () => setInstallOKXOpen(true)} disabled={loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
-            {hasOKX ? (loading && provider === 'okx' ? 'Connecting…' : 'OKX Wallet') : 'Install OKX Wallet'}
+            {hasOKX ? (loading && provider === 'okx' ? 'Connecting' : 'OKX Wallet') : 'Install OKX Wallet'}
           </button>
           <button onClick={hasUniSat ? connectUniSat : () => setInstallOpen(true)} disabled={loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
-            {hasUniSat ? (loading && provider === 'unisat' ? 'Connecting…' : 'UniSat Wallet') : 'Install UniSat Wallet'}
+            {hasUniSat ? (loading && provider === 'unisat' ? 'Connecting' : 'UniSat Wallet') : 'Install UniSat Wallet'}
           </button>
           <button onClick={hasXverse ? connectXverse : () => setInstallXverseOpen(true)} disabled={loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
-            {hasXverse ? (loading && provider === 'xverse' ? 'Connecting…' : 'Xverse Wallet') : 'Install Xverse Wallet'}
+            {hasXverse ? (loading && provider === 'xverse' ? 'Connecting' : 'Xverse Wallet') : 'Install Xverse Wallet'}
           </button>
         </div>
       ) : (
@@ -556,9 +556,9 @@ export default function VerifyPanel() {
           {holdCount !== null && holdCount > 0 ? (
             <div className="space-y-2">
               <div>It looks like you hold <strong>{holdCount}</strong> frogs.</div>
-              <div className="text-xs opacity-80 break-words">#{numbers.slice(0, 12).join(', ')}{numbers.length > 12 ? '…' : ''}</div>
+              <div className="text-xs opacity-80 break-words">#{numbers.slice(0, 12).join(', ')}{numbers.length > 12 ? '' : ''}</div>
               <button onClick={confirmVerify} disabled={loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
-                {loading ? 'Verifying…' : `Verify and reserve [REDACTED] for Bitcoin Frogs`}
+                {loading ? 'Verifying' : `Verify and reserve [REDACTED] for Bitcoin Frogs`}
               </button>
               {claimConflicts && claimConflicts.length > 0 && (
                 <div className="text-red-800 text-[11px]">Already claimed: #{claimConflicts.join(', #')}</div>
@@ -568,7 +568,7 @@ export default function VerifyPanel() {
           ) : holdCount !== null ? (
             <div className="space-y-2">
               <div className="font-semibold">OOPS, IT LOOKS LIKE YOU HAVE 0 FROGS BUT IT'S OKAY.</div>
-              <div>You can still RIBBIT your way up to a pixelated frog.</div>
+              <div>Connect your X for [REDACTED]</div>
             </div>
           ) : null}
 
@@ -582,11 +582,11 @@ export default function VerifyPanel() {
               </div>
             )}
             <div className="mt-2 flex items-center justify-center gap-2 text-[11px]">
-              <a className="underline hover:opacity-80" href="https://x.com/joinfroggys" target="_blank" rel="noopener noreferrer">Follow @joinfroggys</a>
+              <a className="underline hover:opacity-80" href="https://x.com/joinfroggys" target="_blank" rel="noopener noreferrer">Follow</a>
               <span>·</span>
               <a className="underline hover:opacity-80" href={
-                `https://x.com/intent/tweet?text=${encodeURIComponent('RIBBIT #BitcoinFrogs https://www.bitcoinfrogs.art')}`
-              } target="_blank" rel="noopener noreferrer">Tweet RIBBIT</a>
+                `https://x.com/intent/tweet?text=${encodeURIComponent("Believe it or not, @BitcoinFrogs are still undervalued. Here's why: https://www.bitcoinfrogs.art")}`
+              } target="_blank" rel="noopener noreferrer">Tweet</a>
             </div>
           </div>
         </div>
@@ -619,7 +619,7 @@ export default function VerifyPanel() {
             <div className="bg-[#f6a23e] text-black border border-black/30 shadow-2xl rounded p-4 w-full max-w-sm">
               <div className="flex items-center justify-between mb-2">
                 <div className="font-8bit text-base">UniSat Extension Missing</div>
-                <button onClick={() => setInstallOpen(false)} className="font-press text-[10px] hover:opacity-80">✕</button>
+                <button onClick={() => setInstallOpen(false)} className="font-press text-[10px] hover:opacity-80">âœ•</button>
               </div>
               <p className="font-press text-[12px] mb-3">Install UniSat to connect your Bitcoin wallet.</p>
               <div className="flex flex-col gap-2">
@@ -646,7 +646,7 @@ export default function VerifyPanel() {
             <div className="bg-[#f6a23e] text-black border border-black/30 shadow-2xl rounded p-4 w-full max-w-sm">
               <div className="flex items-center justify-between mb-2">
                 <div className="font-8bit text-base">OKX Wallet Missing</div>
-                <button onClick={() => setInstallOKXOpen(false)} className="font-press text-[10px] hover:opacity-80">✕</button>
+                <button onClick={() => setInstallOKXOpen(false)} className="font-press text-[10px] hover:opacity-80">âœ•</button>
               </div>
               <p className="font-press text-[12px] mb-3">Install OKX Wallet to connect your Bitcoin wallet.</p>
               <div className="flex flex-col gap-2">
@@ -673,7 +673,7 @@ export default function VerifyPanel() {
             <div className="bg-[#f6a23e] text-black border border-black/30 shadow-2xl rounded p-4 w-full max-w-sm">
               <div className="flex items-center justify-between mb-2">
                 <div className="font-8bit text-base">Xverse Wallet Missing</div>
-                <button onClick={() => setInstallXverseOpen(false)} className="font-press text-[10px] hover:opacity-80">✕</button>
+                <button onClick={() => setInstallXverseOpen(false)} className="font-press text-[10px] hover:opacity-80">âœ•</button>
               </div>
               <p className="font-press text-[12px] mb-3">Install Xverse to connect your Bitcoin wallet.</p>
               <div className="flex flex-col gap-2">

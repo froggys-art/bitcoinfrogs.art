@@ -3,13 +3,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import FrogShuffle from './components/FrogShuffle'
 import AboutContent from './components/AboutContent'
+import FAQContent from './components/FAQContent'
 import GalleryGrid from './components/GalleryGrid'
 import FilterDrawer, { type TraitGroup, type SelectedMap } from './components/FilterDrawer'
 import ImageModal, { type ViewerItem } from './components/ImageModal'
 const VerifyPanel = dynamic(() => import('./components/VerifyPanel'), { ssr: false })
 
 export default function HomePage() {
-  const [view, setView] = useState<'hero' | 'about' | 'gallery' | 'verify'>('hero')
+  const [view, setView] = useState<'hero' | 'about' | 'gallery' | 'verify' | 'faq'>('hero')
   // Filters
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [traits, setTraits] = useState<TraitGroup[]>([])
@@ -167,6 +168,13 @@ export default function HomePage() {
             >
               VERIFY
             </a>
+            <a
+              href="/#faq"
+              onClick={(e) => { e.preventDefault(); setView('faq'); }}
+              className={`${view === 'faq' ? 'text-black' : 'text-white'} hover:opacity-80`}
+            >
+              FAQ
+            </a>
           </nav>
         </div>
       </div>
@@ -174,20 +182,22 @@ export default function HomePage() {
       {/* Center content (fixed size, centered) */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-5xl z-10" style={{ height: 'clamp(300px,55vh,760px)' }}>
           {/* Hero (image + quote) */}
-          <div className={`absolute inset-0 flex flex-col items-center justify-start transition-opacity duration-300 ${view === 'hero' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-            <FrogShuffle
-              folder="background-bitcoin-orange"
-              intervalMs={900}
-              className="frog-hero"
-              width={240}
-              height={240}
-            />
-            <figure className="mt-1 md:mt-4 max-w-[240px] md:max-w-xl mx-auto">
-              <blockquote className="text-[10px] md:text-[12px] leading-tight text-black">
-                "One fine day I woke up and wanted to put 10,000 frogs on the Bitcoin blockchain at all costs."
-              </blockquote>
-              <figcaption className="mt-0.5 text-[10px] md:text-[12px] text-black/90">— Frogtoshi Nakamoto</figcaption>
-            </figure>
+          <div className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-300 ${view === 'hero' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+            <div className="flex flex-col items-center justify-center text-center px-4">
+              <FrogShuffle
+                folder="background-bitcoin-orange"
+                intervalMs={900}
+                className="frog-hero"
+                width={240}
+                height={240}
+              />
+              <figure className="mt-2 md:mt-4 max-w-[280px] md:max-w-xl mx-auto">
+                <blockquote className="text-[10px] md:text-[12px] leading-tight text-black">
+                  "One fine day I woke up and wanted to put 10,000 frogs on the Bitcoin blockchain at all costs."
+                </blockquote>
+                <figcaption className="mt-0.5 text-[10px] md:text-[12px] text-black/90">— Frogtoshi Nakamoto</figcaption>
+              </figure>
+            </div>
           </div>
           {/* About (scrollable) */}
           <div className={`absolute inset-0 overflow-y-auto px-4 transition-opacity duration-300 text-left scroll-blend ${view === 'about' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
@@ -236,6 +246,10 @@ export default function HomePage() {
           {/* Verify (center simple panel) */}
           <div className={`absolute inset-0 flex items-center justify-center px-4 transition-opacity duration-300 ${view === 'verify' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
             <VerifyPanel />
+          </div>
+          {/* FAQ (scrollable) */}
+          <div className={`absolute inset-0 overflow-y-auto px-4 transition-opacity duration-300 text-left scroll-blend ${view === 'faq' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+            <FAQContent />
           </div>
         </div>
 
