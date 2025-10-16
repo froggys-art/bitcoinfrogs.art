@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getXConfig, exchangeCodeForToken, getCurrentUser, getUserByUsername, isFollowing, findRecentTweetContaining } from '../../../lib/twitter'
-import { addTwitterVerificationDB, saveTwitterTokensDB, syncTwitterVerificationsToSocialFi } from '../../../db/client'
+import { addTwitterVerificationDB, saveTwitterTokensDB, syncTwitterVerificationsToSocialFi, upsertUserDB, ensureLeaderboardRowDB, awardPointsDB, hasScoreEventDB } from '../../../db/client'
 import { saveTwitterTokens, upsertTwitterVerificationMem } from '../../../lib/memdb'
 import { cookies } from 'next/headers'
 
@@ -25,9 +25,9 @@ export async function GET(req: Request) {
     const cookieStore = cookies()
     const storedState = cookieStore.get('x_state')?.value
     const codeVerifier = cookieStore.get('x_code_verifier')?.value
-    const walletAddress = cookieStore.get('x_wallet_address')?.value
+    const walletAddress = cookieStore.get('x_wallet_address')?.value || ''
     
-    if (!storedState || !codeVerifier || !walletAddress) {
+    if (!storedState || !codeVerifier) {
       return NextResponse.redirect(`${url.origin}/?x=error&reason=missing_session_data`)
     }
     
@@ -77,29 +77,10 @@ export async function GET(req: Request) {
     
     const points = (followed ? 10 : 0) + (tweetId ? 10 : 0)
     
-    // Store tokens and verification data
-    saveTwitterTokens(walletAddress, tokens)
-    upsertTwitterVerificationMem({
-      walletId: walletAddress,
-      twitterUserId: userId,
-      handle,
-      followedJoinFroggys: followed,
-      ribbitTweeted: !!tweetId,
-      ribbitTweetId: tweetId || undefined,
-      points,
-      verifiedAt: Date.now()
-    })
-    
-    // Save to database (non-fatal if it fails)
-    try {
-      await saveTwitterTokensDB({
-        walletId: walletAddress,
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        expiresAt: tokens.expiresAt ? new Date(tokens.expiresAt) : undefined
-      })
-      
-      await addTwitterVerificationDB({
+    // Store tokens and verification data (wallet-linked only if wallet provided)
+    if (walletAddress) {
+      saveTwitterTokens(walletAddress, tokens)
+      upsertTwitterVerificationMem({
         walletId: walletAddress,
         twitterUserId: userId,
         handle,
@@ -107,15 +88,59 @@ export async function GET(req: Request) {
         ribbitTweeted: !!tweetId,
         ribbitTweetId: tweetId || undefined,
         points,
-        verifiedAt: new Date()
+        verifiedAt: Date.now()
       })
-      
-      // Automatically sync to leaderboard tables
-      try {
-        await syncTwitterVerificationsToSocialFi()
-        console.log('Successfully synced Twitter verification to leaderboard')
-      } catch (syncError: any) {
-        console.error('Sync to leaderboard failed (non-fatal):', syncError)
+    }
+    
+    // Save to database (non-fatal if it fails)
+    try {
+      if (walletAddress) {
+        await saveTwitterTokensDB({
+          walletId: walletAddress,
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expiresAt: tokens.expiresAt ? new Date(tokens.expiresAt) : undefined
+        })
+        
+        await addTwitterVerificationDB({
+          walletId: walletAddress,
+          twitterUserId: userId,
+          handle,
+          followedJoinFroggys: followed,
+          ribbitTweeted: !!tweetId,
+          ribbitTweetId: tweetId || undefined,
+          points,
+          verifiedAt: new Date()
+        })
+        
+        // Automatically sync to leaderboard tables
+        try {
+          await syncTwitterVerificationsToSocialFi()
+          console.log('Successfully synced Twitter verification to leaderboard')
+        } catch (syncError: any) {
+          console.error('Sync to leaderboard failed (non-fatal):', syncError)
+        }
+      } else {
+        // No wallet provided: upsert Social-Fi user and leaderboard directly
+        try {
+          await upsertUserDB({
+            twitterUserId: userId,
+            twitterHandle: handle,
+            twitterName: undefined,
+            twitterAvatarUrl: undefined,
+          })
+          await ensureLeaderboardRowDB(userId)
+          if (followed) {
+            const has = await hasScoreEventDB(userId, 'follow_ok')
+            if (!has) await awardPointsDB(userId, 'follow_ok', 10)
+          }
+          if (tweetId) {
+            const has = await hasScoreEventDB(userId, 'ribbit')
+            if (!has) await awardPointsDB(userId, 'ribbit', 10, { tweetId })
+          }
+        } catch (socialErr: any) {
+          console.error('Direct Social-Fi upsert failed (non-fatal):', socialErr)
+        }
       }
     } catch (e: any) {
       console.error('Database save error (non-fatal):', e)
@@ -131,7 +156,9 @@ export async function GET(req: Request) {
       walletId: walletAddress,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      expiresAt: tokens.expiresAt
+      expiresAt: tokens.expiresAt,
+      handle,
+      userId
     }))
     
     cookieStore.set('xtok', tokenCookie, {

@@ -122,6 +122,29 @@ export default function VerifyPanel() {
     } catch {}
   }, [address, fetchTwitterStatus])
 
+  // If no wallet is connected, read xtok cookie (set by X OAuth) to reflect X connection status
+  useEffect(() => {
+    if (address) return
+    try {
+      const cookie = document.cookie || ''
+      const found = cookie.split('; ').find((s) => s.startsWith('xtok='))
+      if (found) {
+        const val = decodeURIComponent(found.split('=')[1] || '')
+        const parsed = JSON.parse(val) as { handle?: string }
+        if (parsed && parsed.handle) {
+          setTwitter((prev) => prev || {
+            handle: parsed.handle,
+            followedJoinFroggys: false,
+            ribbitTweeted: false,
+            ribbitTweetId: null,
+            points: 0,
+            verifiedAt: null,
+          })
+        }
+      }
+    } catch {}
+  }, [address])
+
   // Sats Connect helpers: handle both payload and legacy top-level API shapes
   const scGetAddress = useCallback(async (purposes: any[]) => {
     return await new Promise<any>((resolve, reject) => {
@@ -286,12 +309,10 @@ export default function VerifyPanel() {
   }, [provider])
 
   const startX = useCallback(() => {
-    if (!address) {
-      setError('Connect your wallet first to link X')
-      return
-    }
+    setError(null)
     setStatus('Redirecting to X')
-    window.location.href = `/api/x/start?address=${encodeURIComponent(address)}`
+    const url = address ? `/api/x/start?address=${encodeURIComponent(address)}` : '/api/x/start'
+    window.location.href = url
   }, [address])
 
   const connectOKX = useCallback(async () => {
@@ -576,6 +597,12 @@ export default function VerifyPanel() {
           <button onClick={hasXverse ? connectXverse : () => setInstallXverseOpen(true)} disabled={loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
             {hasXverse ? (loading && provider === 'xverse' ? 'Connecting' : 'Xverse Wallet') : 'Install Xverse Wallet'}
           </button>
+          <button onClick={startX} disabled={loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
+            Connect X
+          </button>
+          {twitter?.handle && (
+            <div className="text-left text-[11px] font-press mt-1">Connected X: @{twitter.handle}</div>
+          )}
         </div>
       ) : (
         <div className="font-press text-[12px] space-y-3 mt-1">
@@ -606,8 +633,8 @@ export default function VerifyPanel() {
           ) : null}
 
           <div className="pt-2">
-            <button onClick={startX} disabled={!address || loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
-              {address ? 'Verify X' : 'Connect wallet to verify X'}
+            <button onClick={startX} disabled={loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
+              Verify X
             </button>
             {twitter && (
               <div className="mt-2 text-left text-[11px] font-press space-y-1">

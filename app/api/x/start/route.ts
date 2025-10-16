@@ -8,10 +8,6 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
     const address = url.searchParams.get('address')
-    
-    if (!address || typeof address !== 'string') {
-      return NextResponse.json({ error: 'address parameter required' }, { status: 400 })
-    }
 
     const { clientId, redirectUri } = getXConfig()
     
@@ -34,12 +30,14 @@ export async function GET(req: Request) {
       sameSite: 'lax',
       maxAge: 600 // 10 minutes
     })
-    cookieStore.set('x_wallet_address', address, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 600 // 10 minutes
-    })
+    if (address && typeof address === 'string') {
+      cookieStore.set('x_wallet_address', address, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 600 // 10 minutes
+      })
+    }
     
     // Build the X authorization URL
     const authUrl = buildAuthUrl(state, codeChallenge, clientId, redirectUri)
