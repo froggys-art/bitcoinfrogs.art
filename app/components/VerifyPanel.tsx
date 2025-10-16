@@ -579,78 +579,26 @@ export default function VerifyPanel() {
 
   return (
     <div className="w-full max-w-md mx-auto text-center text-black">
-      {!address && (
-        <h2 className="font-8bit text-xl md:text-2xl mb-4">CONNECT YOUR WALLET TO RIBBIT</h2>
-      )}
+      <h2 className="font-8bit text-xl md:text-2xl mb-4">CONNECT X TO RIBBIT</h2>
       {status && (
         <div className="mt-1 text-[11px] font-press opacity-80">{status}</div>
       )}
 
-      {!address ? (
-        <div className="space-y-2 font-press text-[12px]">
-          <button onClick={hasOKX ? connectOKX : () => setInstallOKXOpen(true)} disabled={loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
-            {hasOKX ? (loading && provider === 'okx' ? 'Connecting' : 'OKX Wallet') : 'Install OKX Wallet'}
-          </button>
-          <button onClick={hasUniSat ? connectUniSat : () => setInstallOpen(true)} disabled={loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
-            {hasUniSat ? (loading && provider === 'unisat' ? 'Connecting' : 'UniSat Wallet') : 'Install UniSat Wallet'}
-          </button>
-          <button onClick={hasXverse ? connectXverse : () => setInstallXverseOpen(true)} disabled={loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
-            {hasXverse ? (loading && provider === 'xverse' ? 'Connecting' : 'Xverse Wallet') : 'Install Xverse Wallet'}
-          </button>
-          <button onClick={startX} disabled={loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
-            Connect X
-          </button>
-          {twitter?.handle && (
-            <div className="text-left text-[11px] font-press mt-1">Connected X: @{twitter.handle}</div>
-          )}
+      <div className="space-y-2 font-press text-[12px]">
+        <button onClick={startX} disabled={loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
+          Connect X
+        </button>
+        {twitter?.handle && (
+          <div className="text-left text-[11px] font-press mt-1">Connected X: @{twitter.handle}</div>
+        )}
+        <div className="mt-2 flex items-center justify-center gap-2 text-[11px]">
+          <button type="button" onClick={openXFollow} className="underline hover:opacity-80">Follow</button>
+          <span>·</span>
+          <a className="underline hover:opacity-80" href={
+            `https://x.com/intent/tweet?text=${encodeURIComponent("Believe it or not, @BitcoinFrogs and Ordinals are still undervalued.\n\nHere's why: https://bitcoinfrogs.art\n\nRIBBIT")}`
+          } target="_blank" rel="noopener noreferrer">Tweet</a>
         </div>
-      ) : (
-        <div className="font-press text-[12px] space-y-3 mt-1">
-          <div className="space-y-2">
-            <div className="font-mono text-[12px] break-all">{address}</div>
-            <button onClick={disconnect} className="inline-flex items-center h-8 px-3 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition text-[11px]">
-              Disconnect
-            </button>
-          </div>
-
-          {holdCount !== null && holdCount > 0 ? (
-            <div className="space-y-2">
-              <div>It looks like you hold <strong>{holdCount}</strong> frogs.</div>
-              <div className="text-xs opacity-80 break-words">#{numbers.slice(0, 12).join(', ')}{numbers.length > 12 ? '' : ''}</div>
-              <button onClick={confirmVerify} disabled={loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
-                {loading ? 'Verifying' : `Verify and reserve [REDACTED] for Bitcoin Frogs`}
-              </button>
-              {claimConflicts && claimConflicts.length > 0 && (
-                <div className="text-red-800 text-[11px]">Already claimed: #{claimConflicts.join(', #')}</div>
-              )}
-              {confirmed && <div className="text-green-800">Verified!</div>}
-            </div>
-          ) : holdCount !== null ? (
-            <div className="space-y-2">
-              <div className="font-semibold">OOPS, IT LOOKS LIKE YOU HAVE 0 FROGS BUT IT'S OKAY.</div>
-              <div>Connect your X for [REDACTED]</div>
-            </div>
-          ) : null}
-
-          <div className="pt-2">
-            <button onClick={startX} disabled={loading} className="w-full py-2.5 rounded border border-black/30 bg-black/5 hover:bg-black/10 transition">
-              Verify X
-            </button>
-            {twitter && (
-              <div className="mt-2 text-left text-[11px] font-press space-y-1">
-                <div>Connected X: {twitter.handle ? `@${twitter.handle}` : 'unknown'}</div>
-              </div>
-            )}
-            <div className="mt-2 flex items-center justify-center gap-2 text-[11px]">
-              <button type="button" onClick={openXFollow} className="underline hover:opacity-80">Follow</button>
-              <span>·</span>
-              <a className="underline hover:opacity-80" href={
-                `https://x.com/intent/tweet?text=${encodeURIComponent("Believe it or not, @BitcoinFrogs and Ordinals are still undervalued.\n\nHere's why: https://bitcoinfrogs.art\n\nRIBBIT")}`
-              } target="_blank" rel="noopener noreferrer">Tweet</a>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
 
       {error && (
         <div className="mt-3 text-red-800 text-[11px] font-press">
